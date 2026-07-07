@@ -565,7 +565,7 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
         Projects
       </div>
-      <div class="nav-item" data-view="soon" data-label="Simulation">
+      <div class="nav-item" data-view="simulation">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
         Simulation
       </div>
@@ -1066,6 +1066,33 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
         </div>
       </section>
 
+      <!-- ================= SIMULATION ================= -->
+      <section class="view" id="view-simulation">
+        <div class="page-head stagger">
+          <div>
+            <div class="page-title">Scenario <span class="serif">Simulation</span></div>
+            <div class="page-sub">Stress-test the optimized schedule. Pick a what-if — the engine re-solves and shows the real impact.</div>
+          </div>
+        </div>
+
+        <div class="card glass card-pad stagger">
+          <div class="card-head"><h3>Scenario library</h3><span class="link" id="simSel">None selected</span></div>
+          <div class="solver-opts" id="simGrid"></div>
+          <button class="btn primary" id="simRun" style="margin-top:18px;justify-content:center;width:100%;padding:12px" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 4l14 8-14 8V4z"/></svg>
+            <span>Run simulation</span>
+          </button>
+        </div>
+
+        <div id="simResults" style="display:none;margin-top:22px">
+          <div class="grid g-4 stagger" id="simKpis" style="margin-bottom:18px"></div>
+          <div class="card glass card-pad stagger">
+            <div class="card-head"><h3>What the engine did</h3><span class="link">Re-solved under scenario</span></div>
+            <p id="simExplain" style="font-size:13.5px;color:var(--text-dim);line-height:1.7"></p>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= SOON (placeholder) ================= -->
       <section class="view" id="view-soon">
         <div class="page-head stagger">
@@ -1113,14 +1140,16 @@ const OPT = (()=>{
   function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
   const M=20, N=250, PEAK_MULT=1.6, KWH_COST=0.15, LATE_PENALTY=50, HOUR_VALUE=18;
 
-  function buildData(){
+  function buildData(sc){
+    sc=sc||{};
     const r=rng(20250707);
-    const machines=Array.from({length:M},(_,j)=>({speed:0.85+r()*0.5, power:5+r()*6}));
+    let machines=Array.from({length:M},(_,j)=>({speed:0.85+r()*0.5, power:(5+r()*6)*(sc.powerMult||1)}));
     const jobs=Array.from({length:N},(_,i)=>{
-      const dur=0.5+r()*3.5;                       // base hours
+      const dur=(0.5+r()*3.5)*(sc.durMult||1);     // base hours (demand scales this)
       const tier=r()<0.2?3:(r()<0.5?2:1);          // A/B/C priority weight
-      return {dur, tier, deadline:8+r()*60};       // deadline in hours
+      return {dur, tier, deadline:(8+r()*60)*(sc.deadlineMult||1)};
     });
+    if(sc.machinesOff) machines=machines.slice(0, Math.max(5, M-sc.machinesOff)); // failure/absence
     return {machines, jobs};
   }
 
@@ -1136,6 +1165,7 @@ const OPT = (()=>{
 
   // evaluate an assignment: machineJobs[m] = ordered array of job indices
   function evaluate(D, machineJobs){
+    const MM=D.machines.length;
     let makespan=0, energy=0, lateness=0, onTime=0, busy=0;
     machineJobs.forEach((list,m)=>{
       let clock=0; const mc=D.machines[m];
@@ -1149,11 +1179,10 @@ const OPT = (()=>{
       }
       if(clock>makespan) makespan=clock;
     });
-    const util = busy/(M*makespan);
-    return {makespan, energy, lateness, onTime:onTime/N, util};
+    return {makespan, energy, lateness, onTime:onTime/N, util:busy/(MM*makespan), mm:MM};
   }
 
-  function money(s){ return s.energy*KWH_COST + s.makespan*M*HOUR_VALUE + s.lateness*LATE_PENALTY; }
+  function money(s, kwhCost){ return s.energy*(kwhCost||KWH_COST) + s.makespan*s.mm*HOUR_VALUE + s.lateness*LATE_PENALTY; }
 
   // weighted, baseline-normalized cost the solvers minimize
   function cost(s, base, w){
@@ -1161,17 +1190,17 @@ const OPT = (()=>{
          + w.d*(s.lateness/(base.lateness||1));
   }
 
-  function naive(D){ const mj=Array.from({length:M},()=>[]); D.jobs.forEach((_,i)=>mj[i%M].push(i)); return mj; }
+  function naive(D){ const mm=D.machines.length, mj=Array.from({length:mm},()=>[]); D.jobs.forEach((_,i)=>mj[i%mm].push(i)); return mj; }
 
   // LPT-style greedy: heaviest/highest-tier jobs first, onto the machine that
   // adds least weighted cost
   function greedy(D, base, w){
-    const mj=Array.from({length:M},()=>[]);
+    const mm=D.machines.length, mj=Array.from({length:mm},()=>[]);
     const order=D.jobs.map((j,i)=>i).sort((a,b)=>
       (D.jobs[b].tier-D.jobs[a].tier) || (D.jobs[b].dur-D.jobs[a].dur));
     for(const ji of order){
       let bestM=0, bestC=Infinity;
-      for(let m=0;m<M;m++){ mj[m].push(ji);
+      for(let m=0;m<mm;m++){ mj[m].push(ji);
         const c=cost(evaluate(D,mj),base,w); mj[m].pop();
         if(c<bestC){bestC=c;bestM=m;}
       }
@@ -1184,14 +1213,14 @@ const OPT = (()=>{
 
   // simulated annealing: move/swap jobs, accept downhill or by Boltzmann prob
   function anneal(D, base, w, start, iters, seed){
-    const r=rng(seed); let cur=clone(start), curC=cost(evaluate(D,cur),base,w);
+    const r=rng(seed), mm=D.machines.length; let cur=clone(start), curC=cost(evaluate(D,cur),base,w);
     let best=clone(cur), bestC=curC;
     for(let k=0;k<iters;k++){
       const T=0.12*(1-k/iters)+0.001;
       const next=clone(cur);
-      const a=(r()*M)|0; if(!next[a].length) continue;
+      const a=(r()*mm)|0; if(!next[a].length) continue;
       const pi=(r()*next[a].length)|0, ji=next[a].splice(pi,1)[0];
-      const b=(r()*M)|0; next[b].splice((r()*(next[b].length+1))|0,0,ji);
+      const b=(r()*mm)|0; next[b].splice((r()*(next[b].length+1))|0,0,ji);
       const nc=cost(evaluate(D,next),base,w);
       if(nc<curC || r()<Math.exp((curC-nc)/T)){ cur=next; curC=nc;
         if(nc<bestC){best=next;bestC=nc;} }
@@ -1209,15 +1238,16 @@ const OPT = (()=>{
     return {kind, m, cost:cost(m,base,w), time:+(0.6+iters/220+ (kind==='quantum'?1.4:0)).toFixed(1)};
   }
 
-  function run(weights){
-    const D=buildData();
+  function run(weights, scenario){
+    const D=buildData(scenario);
+    const kwh=KWH_COST*((scenario&&scenario.energyMult)||1);
     const baseMj=naive(D), base=evaluate(D,baseMj);
     const w={t:weights.t, e:weights.e, d:weights.d};
     const naiveCost=cost(base,base,w); // = t+e+d by construction
     const solvers=['classical','quantum','hybrid'].map(k=>solve(D,base,w,k));
     solvers.forEach(s=>{ s.quality=Math.round(100*(1-(s.cost-Math.min(...solvers.map(x=>x.cost)))/naiveCost)); });
     const best=solvers.reduce((a,b)=>a.cost<b.cost?a:b);
-    return {base, baseMoney:money(base), naiveCost, solvers, best,
+    return {base, baseMoney:money(base,kwh), bestMoney:money(best.m,kwh), naiveCost, solvers, best, kwh,
             improvePct:Math.round(100*(naiveCost-best.cost)/naiveCost)};
   }
 
@@ -1232,8 +1262,8 @@ const OPT = (()=>{
 })();
 
 /* ============================================================ ROUTER */
-const views = ['dashboard','problem','twin','optimization','soon'];
-const titles = {dashboard:'Dashboard',problem:'Problem',twin:'Digital Twin',optimization:'Optimization',soon:'Workspace'};
+const views = ['dashboard','problem','twin','optimization','simulation','soon'];
+const titles = {dashboard:'Dashboard',problem:'Problem',twin:'Digital Twin',optimization:'Optimization',simulation:'Simulation',soon:'Workspace'};
 let current='dashboard';
 
 function go(v, label){
@@ -1563,6 +1593,68 @@ function finishRun(){
   toast('Optimization complete',`${nameOf[winner]} found the best schedule · score ${score}`,'gold');
 }
 
+/* ============================================================ SIMULATION */
+const scenarios=[
+  {id:'mfail',   icon:'⚠️', name:'Machine failure',       desc:'3 CNC machines go down',  sc:{machinesOff:3}},
+  {id:'demand',  icon:'📈', name:'Demand +30%',           desc:'Order volume spikes',     sc:{durMult:1.3}},
+  {id:'energy',  icon:'⚡', name:'Energy price +40%',      desc:'Peak tariff surge',       sc:{energyMult:1.4}},
+  {id:'absence', icon:'👷', name:'Worker absence',         desc:'2 machines unstaffed',    sc:{machinesOff:2}},
+  {id:'supplier',icon:'🚛', name:'Supplier delay',         desc:'Deadlines pulled 20% in', sc:{deadlineMult:0.8}},
+  {id:'maint',   icon:'🔧', name:'Equipment maintenance',  desc:'Slower runs, 1 offline',  sc:{durMult:1.15,machinesOff:1}},
+];
+let simPick=null;
+function buildSims(){
+  const grid=document.getElementById('simGrid'); if(!grid||grid.dataset.built) return; grid.dataset.built='1';
+  grid.innerHTML=scenarios.map(s=>`
+    <div class="solver" data-sim="${s.id}">
+      <div class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4 10-10"/></svg></div>
+      <div class="sic" style="font-size:16px">${s.icon}</div>
+      <div class="sn">${s.name}</div><div class="sd">${s.desc}</div>
+    </div>`).join('');
+  grid.querySelectorAll('.solver').forEach(el=>el.onclick=()=>{
+    grid.querySelectorAll('.solver').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on'); simPick=scenarios.find(s=>s.id===el.dataset.sim);
+    document.getElementById('simSel').textContent=simPick.name;
+    document.getElementById('simRun').disabled=false;
+  });
+}
+function pctChange(a,b){ return Math.round(100*(b-a)/(a||1)); }
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#simRun')) return;
+  if(!simPick) return;
+  const wv=[...document.querySelectorAll('.obj-row input[type=range]')].map(i=>+i.value/100);
+  const W={t:wv[0]||0.7, e:wv[1]||0.55, d:wv[2]||0.9};
+  const nom=OPT.run(W), sim=OPT.run(W, simPick.sc);
+  renderSim(nom,sim);
+});
+function renderSim(nom,sim){
+  const a=nom.best.m, b=sim.best.m;
+  const dm=pctChange(a.makespan,b.makespan), dc=pctChange(nom.bestMoney,sim.bestMoney);
+  const kpis=[
+    {l:'Makespan',    v:(b.makespan/24).toFixed(1)+'d',        d:dm,                                inv:true},
+    {l:'Projected cost', v:'$'+Math.round(sim.bestMoney/1000)+'K', d:dc,                             inv:true},
+    {l:'On-time',     v:(b.onTime*100).toFixed(1)+'%',         d:Math.round((b.onTime-a.onTime)*100), inv:false, pp:true},
+    {l:'Utilization', v:Math.round(b.util*100)+'%',            d:pctChange(a.util,b.util),           inv:false},
+  ];
+  document.getElementById('simKpis').innerHTML=kpis.map(k=>{
+    const good = k.inv ? k.d<=0 : k.d>=0;
+    const col  = good ? 'var(--emerald)' : 'var(--crimson)';
+    const arrow= k.d>0?'▲':(k.d<0?'▼':'■');
+    const dtxt = k.pp ? ((k.d>0?'+':'')+k.d+' pp') : ((k.d>0?'+':'')+k.d+'%');
+    return `<div class="card glass res-kpi"><div class="rl">${k.l}</div><div class="rv">${k.v}</div>
+      <div class="rd" style="color:${col}">${arrow} ${dtxt} vs nominal</div></div>`;
+  }).join('');
+  document.getElementById('simExplain').textContent=
+    `Under “${simPick.name}”, the engine re-solved ${b.mm} available machines across 250 jobs. `+
+    `Makespan ${dm>=0?'rose':'fell'} ${Math.abs(dm)}% and projected cost ${dc>=0?'increased':'dropped'} ${Math.abs(dc)}%, `+
+    `holding on-time delivery at ${(b.onTime*100).toFixed(1)}%. `+
+    (dm>8 ? 'Recommendation: add capacity or pull Tier-A jobs earlier to protect deadlines.'
+          : 'The optimized schedule absorbs this scenario with minimal disruption.');
+  const r=document.getElementById('simResults'); r.style.display='block';
+  r.querySelectorAll('.stagger').forEach(s=>{s.style.animation='none';void s.offsetWidth;s.style.animation=''});
+  toast('Simulation complete', simPick.name+' · schedule re-solved','gold');
+}
+
 /* ============================================================ COMMAND PALETTE */
 const cmds=[
   {sec:'Navigate',items:[
@@ -1633,7 +1725,7 @@ function init(){
   const d=new Date();
   document.getElementById('todayLine').textContent =
     d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) + " · your operations at a glance.";
-  drawSparks(); runCounts(document.getElementById('view-dashboard')); drawImpact(); buildTwin();
+  drawSparks(); runCounts(document.getElementById('view-dashboard')); drawImpact(); buildTwin(); buildSims();
 }
 init();
 </script>
