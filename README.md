@@ -59,4 +59,4 @@ OR-Tools (CP-SAT) and Qiskit are **optional** imports — enabled on a supported
 - [ ] Problem (AI extraction UI)
 - [ ] Digital Twin (React Flow graph)
 - [x] Simulation (scenario library — 6 what-ifs, engine-driven deltas)
-- [ ] Reports (executive/technical + CSV/PDF)
+- [x] Reports (executive/optimization/technical + CSV/PDF)
