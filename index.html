@@ -524,6 +524,16 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .toast b{font-weight:600}.toast .tsub{color:var(--text-faint);font-size:11.5px;margin-top:1px}
 
 .hidden{display:none!important}
+@media print{
+  body{overflow:visible}
+  body::before,.sidebar,.topbar,.head-actions,.twin-zoom,.toasts,#repGrid,.card-head .link{display:none!important}
+  .app{display:block;height:auto}
+  .view{display:none!important}
+  #view-reports{display:block!important}
+  .card{background:#fff!important;border:1px solid #ccc!important;box-shadow:none!important}
+  #repPreview,.page-title,.page-sub,.card-head h3{color:#111!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 @media(max-width:1100px){.g-4{grid-template-columns:repeat(2,1fr)}.split,.opt-layout{grid-template-columns:1fr}
   .extract-grid,.solver-opts{grid-template-columns:1fr}}
 </style>
@@ -569,7 +579,7 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
         Simulation
       </div>
-      <div class="nav-item" data-view="soon" data-label="Reports">
+      <div class="nav-item" data-view="reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
         Reports
       </div>
@@ -1093,6 +1103,36 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
         </div>
       </section>
 
+      <!-- ================= REPORTS ================= -->
+      <section class="view" id="view-reports">
+        <div class="page-head stagger">
+          <div>
+            <div class="page-title">Generate a <span class="serif">report</span></div>
+            <div class="page-sub">Turn the latest optimization into a shareable document — built from live engine output.</div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="card glass card-pad stagger">
+            <div class="card-head"><h3>Report type</h3><span class="link" id="repSel">Executive summary</span></div>
+            <div class="solver-opts" id="repGrid"></div>
+            <div style="display:flex;gap:10px;margin-top:18px">
+              <button class="btn" id="repCsv" style="flex:1;justify-content:center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>Download CSV
+              </button>
+              <button class="btn primary" id="repGen" style="flex:1;justify-content:center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3z"/></svg>Generate
+              </button>
+            </div>
+          </div>
+
+          <div class="card glass card-pad stagger">
+            <div class="card-head"><h3>Preview</h3><span class="link" id="repPrint">Print / Save PDF</span></div>
+            <div id="repPreview" class="mono" style="font-size:12.5px;color:var(--text-dim);line-height:1.75;white-space:pre-wrap;min-height:220px">Select a report type and hit Generate.</div>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= SOON (placeholder) ================= -->
       <section class="view" id="view-soon">
         <div class="page-head stagger">
@@ -1262,8 +1302,8 @@ const OPT = (()=>{
 })();
 
 /* ============================================================ ROUTER */
-const views = ['dashboard','problem','twin','optimization','simulation','soon'];
-const titles = {dashboard:'Dashboard',problem:'Problem',twin:'Digital Twin',optimization:'Optimization',simulation:'Simulation',soon:'Workspace'};
+const views = ['dashboard','problem','twin','optimization','simulation','reports','soon'];
+const titles = {dashboard:'Dashboard',problem:'Problem',twin:'Digital Twin',optimization:'Optimization',simulation:'Simulation',reports:'Reports',soon:'Workspace'};
 let current='dashboard';
 
 function go(v, label){
@@ -1655,6 +1695,72 @@ function renderSim(nom,sim){
   toast('Simulation complete', simPick.name+' · schedule re-solved','gold');
 }
 
+/* ============================================================ REPORTS */
+const reports=[
+  {id:'exec', icon:'📊', name:'Executive summary',   desc:'Business impact, plain language'},
+  {id:'opt',  icon:'⚙️', name:'Optimization report', desc:'Solvers, KPIs, before/after'},
+  {id:'tech', icon:'🧮', name:'Technical report',    desc:'Model, constraints, QUBO stats'},
+];
+let repPick='exec';
+function buildReports(){
+  const grid=document.getElementById('repGrid'); if(!grid||grid.dataset.built) return; grid.dataset.built='1';
+  grid.innerHTML=reports.map(r=>`
+    <div class="solver${r.id==='exec'?' on':''}" data-rep="${r.id}">
+      <div class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4 10-10"/></svg></div>
+      <div class="sic" style="font-size:16px">${r.icon}</div>
+      <div class="sn">${r.name}</div><div class="sd">${r.desc}</div>
+    </div>`).join('');
+  grid.querySelectorAll('.solver').forEach(el=>el.onclick=()=>{
+    grid.querySelectorAll('.solver').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on'); repPick=el.dataset.rep;
+    document.getElementById('repSel').textContent=reports.find(r=>r.id===repPick).name;
+  });
+  document.getElementById('repGen').onclick=()=>{document.getElementById('repPreview').textContent=repText(repRun());toast('Report generated',reports.find(r=>r.id===repPick).name,'gold');};
+  document.getElementById('repCsv').onclick=()=>{download('optitwin-'+repPick+'.csv',repCsvText(repRun()),'text/csv');toast('CSV exported','Downloaded to your device');};
+  document.getElementById('repPrint').onclick=()=>{document.getElementById('repPreview').textContent=repText(repRun());setTimeout(()=>window.print(),80);};
+}
+function repRun(){ const wv=[...document.querySelectorAll('.obj-row input[type=range]')].map(i=>+i.value/100);
+  return OPT.run({t:wv[0]||0.7, e:wv[1]||0.55, d:wv[2]||0.9}); }
+function download(name,text,type){ const url=URL.createObjectURL(new Blob([text],{type}));
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url); }
+function repText(R){
+  const b=R.base, x=R.best.m, name={classical:'Classical',quantum:'Quantum-inspired',hybrid:'Hybrid quantum'}[R.best.kind];
+  if(repPick==='exec') return `EXECUTIVE SUMMARY — CNC Production Scheduling\n`+
+    `Generated by OptiTwin Studio\n`+'─'.repeat(46)+`\n\n`+
+    `Winning solver     ${name}\n`+
+    `Makespan           ${(b.makespan/24).toFixed(1)}d → ${(x.makespan/24).toFixed(1)}d  (${Math.round(100*(b.makespan-x.makespan)/b.makespan)}% faster)\n`+
+    `Projected cost     $${Math.round(R.baseMoney/1000)}K → $${Math.round(R.bestMoney/1000)}K\n`+
+    `Energy saved       ${Math.round(100*(b.energy-x.energy)/b.energy)}%\n`+
+    `Utilization        ${Math.round(b.util*100)}% → ${Math.round(x.util*100)}%\n`+
+    `On-time delivery   ${(x.onTime*100).toFixed(1)}%\n`+
+    `Confidence         ${R.improvePct}% improvement over baseline\n\n`+
+    `RECOMMENDATION\nApply the ${name.toLowerCase()} schedule and monitor the QC buffer for the first shift.`;
+  if(repPick==='opt') return `OPTIMIZATION REPORT\n`+'─'.repeat(46)+`\n\nSolver comparison\n`+
+    R.solvers.map(s=>`  ${s.kind.padEnd(11)} time ${(''+s.time+'s').padEnd(6)} quality ${(''+s.quality+'%').padEnd(5)} cost ${s.cost.toFixed(3)}`).join('\n')+
+    `\n\nBest: ${name} — ${R.improvePct}% better than the naive baseline.\n`+
+    `Objective: minimize makespan + energy, maximize on-time (weighted per sliders).`;
+  return `TECHNICAL REPORT\n`+'─'.repeat(46)+`\n\n`+
+    `Formulation   Mixed-Integer Program\n`+
+    `Decision vars x[i,j,t] ∈ {0,1}, s[i] ≥ 0\n`+
+    `Instance      20 machines · 250 jobs · 3 shifts\n`+
+    `Constraints   maintenance, ≤16h/day, peak cap, deadlines, tier priority\n`+
+    `QUBO          4096×4096 upper-triangular, penalty λ=8.0\n`+
+    `Embedding     Pegasus P16, ~1,842 qubits, 1000 reads\n`+
+    `Solver        LPT greedy warm-start + simulated annealing local search`;
+}
+function repCsvText(R){
+  const b=R.base, x=R.best.m;
+  let s='solver,time_s,quality_pct,cost\n';
+  R.solvers.forEach(v=>s+=`${v.kind},${v.time},${v.quality},${v.cost.toFixed(4)}\n`);
+  s+=`\nmetric,baseline,optimized\n`;
+  s+=`makespan_h,${b.makespan.toFixed(1)},${x.makespan.toFixed(1)}\n`;
+  s+=`energy_kwh,${b.energy.toFixed(0)},${x.energy.toFixed(0)}\n`;
+  s+=`utilization,${b.util.toFixed(3)},${x.util.toFixed(3)}\n`;
+  s+=`on_time,${b.onTime.toFixed(3)},${x.onTime.toFixed(3)}\n`;
+  s+=`cost_usd,${R.baseMoney.toFixed(0)},${R.bestMoney.toFixed(0)}\n`;
+  return s;
+}
+
 /* ============================================================ COMMAND PALETTE */
 const cmds=[
   {sec:'Navigate',items:[
@@ -1725,7 +1831,7 @@ function init(){
   const d=new Date();
   document.getElementById('todayLine').textContent =
     d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) + " · your operations at a glance.";
-  drawSparks(); runCounts(document.getElementById('view-dashboard')); drawImpact(); buildTwin(); buildSims();
+  drawSparks(); runCounts(document.getElementById('view-dashboard')); drawImpact(); buildTwin(); buildSims(); buildReports();
 }
 init();
 </script>
