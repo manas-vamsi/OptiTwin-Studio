@@ -355,6 +355,13 @@ main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .twin-zoom button{width:38px;height:38px;background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:17px}
 .twin-zoom button:hover{background:var(--surface-2);color:var(--text)}
 .twin-zoom button + button{border-top:1px solid var(--border-soft)}
+/* React Flow controls — match .twin-zoom dark chrome */
+.react-flow__controls{box-shadow:none;border-radius:11px;overflow:hidden;border:1px solid var(--border-soft);background:rgba(15,15,16,0.6);backdrop-filter:blur(10px)}
+.react-flow__controls-button{width:38px;height:38px;background:transparent;border:none;border-bottom:1px solid var(--border-soft)}
+.react-flow__controls-button:last-child{border-bottom:none}
+.react-flow__controls-button svg{fill:var(--text-dim)}
+.react-flow__controls-button:hover{background:var(--surface-2)}
+.react-flow__controls-button:hover svg{fill:var(--text)}
 
 /* Drawer */
 .drawer{
