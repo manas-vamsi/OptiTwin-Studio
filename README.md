@@ -16,6 +16,39 @@ and explains every decision.
 |---|---|
 | ![Twin](docs/screens/twin.png) | ![Optimization](docs/screens/optimization.png) |
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Frontend["frontend · Next.js 15 / React 19"]
+        UI["6 views<br/>dashboard · problem · twin<br/>optimization · simulation · reports"]
+        LOCAL["lib/optimizer.ts<br/>in-browser fallback"]
+    end
+
+    subgraph Backend["backend · FastAPI (Python 3.12)"]
+        API["main.py<br/>/api/solve · /api/qubo · /health"]
+        ENGINE["solver.py<br/>model · evaluate · orchestrate"]
+        QUBO["qubo.py<br/>objective + one-hot penalty<br/>~675k nonzeros"]
+    end
+
+    subgraph Solvers["native solver cores (C++/Rust)"]
+        CPSAT["OR-Tools CP-SAT<br/>classical · exact · 3s cap"]
+        NEAL["dwave-samplers SA<br/>quantum-inspired · QPU-ready"]
+        RUST["optitwin_kernel (PyO3)<br/>SA hot loop · 56x"]
+    end
+
+    UI -- "/api proxy" --> API
+    UI -. "backend down" .-> LOCAL
+    API --> ENGINE
+    ENGINE --> QUBO --> NEAL
+    ENGINE --> CPSAT
+    ENGINE --> RUST
+```
+
+Every solve request runs three genuinely different methods and reports each
+one's true engine and wall-clock time; any missing library degrades to the
+pure-Python path, and a dead backend degrades to the in-browser optimizer.
+
 ## Structure
 
 ```
@@ -31,6 +64,9 @@ prototype/   original single-file design reference (index.html)
 ```
 
 ## Run
+
+Presenting this at a demo or exhibition? The 3-minute walkthrough and Q&A
+answers live in [DEMO.md](DEMO.md).
 
 **One command (Docker)**
 ```bash
