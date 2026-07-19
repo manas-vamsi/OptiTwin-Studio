@@ -27,7 +27,7 @@ export default function Dashboard() {
     <>
       <div className="page-head stagger">
         <div>
-          <div className="page-title">Good morning, <span className="serif">Karthik</span></div>
+          <div className="page-title">Good morning, <span className="serif">Manas</span></div>
           <div className="page-sub">Here&apos;s what your operations look like today.</div>
         </div>
         <div className="head-actions">
@@ -90,7 +90,7 @@ export default function Dashboard() {
               <div className="tl-item ok"><div className="t"><b>Hybrid solver</b> found a better solution</div><div className="ts">CNC Scheduling · 8 min ago</div></div>
               <div className="tl-item ok"><div className="t"><b>Simulation</b> completed — Machine failure</div><div className="ts">Delivery Routing · 41 min ago</div></div>
               <div className="tl-item"><div className="t"><b>Report</b> generated (Executive Summary)</div><div className="ts">Warehouse · 2 hrs ago</div></div>
-              <div className="tl-item"><div className="t"><b>Karthik</b> edited 3 constraints</div><div className="ts">CNC Scheduling · Yesterday</div></div>
+              <div className="tl-item"><div className="t"><b>Manas</b> edited 3 constraints</div><div className="ts">CNC Scheduling · Yesterday</div></div>
             </div>
           </div>
         </div>

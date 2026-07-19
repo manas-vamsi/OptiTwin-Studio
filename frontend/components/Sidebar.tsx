@@ -43,9 +43,9 @@ export default function Sidebar() {
       </nav>
       <div className="spacer" />
       <div className="user-card">
-        <div className="avatar">JK</div>
+        <div className="avatar">MV</div>
         <div style={{ minWidth: 0 }}>
-          <div className="u-name">Karthik</div>
+          <div className="u-name">Manas</div>
           <div className="u-mail">nexvista.com</div>
         </div>
       </div>
