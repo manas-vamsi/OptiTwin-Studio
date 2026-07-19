@@ -12,6 +12,9 @@ __pycache__/
 .venv*/
 venv/
 
+# rust
+backend/kernel/target/
+
 # misc
 .DS_Store
 .env

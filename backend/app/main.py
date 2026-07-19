@@ -16,7 +16,8 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "ortools": solver.HAS_ORTOOLS}
+    return {"ok": True, "ortools": solver.HAS_ORTOOLS,
+            "neal": solver.HAS_NEAL, "rust": solver.HAS_RUST}
 
 
 @app.post("/api/solve")
