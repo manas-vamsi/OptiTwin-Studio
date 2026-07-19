@@ -1,5 +1,8 @@
 # OptiTwin Studio
 
+[![CI](https://github.com/manas-vamsi/OptiTwin-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/manas-vamsi/OptiTwin-Studio/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue) ![Rust](https://img.shields.io/badge/rust-PyO3_kernel_56x-orange) ![Solvers](https://img.shields.io/badge/solvers-CP--SAT_·_QUBO_annealing-8A2BE2)
+
 Enterprise decision-intelligence platform — **Design • Simulate • Optimize • Explain**.
 Describe an operations problem in plain language; the platform builds a digital twin,
 solves it with classical / quantum-inspired / hybrid optimizers, simulates scenarios,
