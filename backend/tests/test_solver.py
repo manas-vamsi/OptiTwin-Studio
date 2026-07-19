@@ -53,6 +53,24 @@ def test_real_backends_report_truthfully():
         assert R["solvers"][1]["backend"] == "neal"
 
 
+def test_db_persistence_or_graceful_noop():
+    from app import db
+    w = {"t": 0.7, "e": 0.55, "d": 0.9}
+    if db.available():
+        R = solver.run(w)
+        rid = db.save_run(w, None, R)
+        assert rid is not None
+        assert db.get_run(rid)["result"]["improvePct"] == R["improvePct"]
+        assert any(r["id"] == rid for r in db.list_runs())
+        print(f"  (postgres live: run {rid} round-tripped)")
+    else:
+        # no DB -> every call is a quiet no-op, nothing raises
+        assert db.save_run(w, None, {"improvePct": 0, "best": {"kind": "x", "backend": "y"}}) is None
+        assert db.list_runs() == []
+        assert db.get_run(1) is None
+        print("  (no postgres: graceful no-op verified)")
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

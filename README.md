@@ -57,7 +57,7 @@ frontend/    Next.js 15 · React 19 · TypeScript · Tailwind        (the UI)
   components/  Sidebar, Topbar, KPI/spark widgets
   lib/         optimizer.ts (client fallback), api.ts, types.ts
 backend/     FastAPI · Python                                      (the solver service)
-  app/         main.py (API), solver.py (engine), qubo.py (QUBO), models.py
+  app/         main.py (API), solver.py (engine), qubo.py (QUBO), db.py (run history), models.py
   kernel/      Rust SA kernel (PyO3) — 56x faster hot loop, optional
   tests/       runnable solver tests + kernel benchmark
 prototype/   original single-file design reference (index.html)
