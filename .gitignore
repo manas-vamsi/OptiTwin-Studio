@@ -19,3 +19,4 @@ backend/kernel/target/
 .DS_Store
 .env
 .env.local
+.gstack/
