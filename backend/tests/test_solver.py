@@ -53,6 +53,29 @@ def test_real_backends_report_truthfully():
         assert R["solvers"][1]["backend"] == "neal"
 
 
+def test_custom_problem_counts():
+    R = solver.run({"t": 0.7, "e": 0.55, "d": 0.9}, None, {"nMachines": 3, "nJobs": 12})
+    m = R["best"]["m"]
+    assert m["mm"] == 3 and m["n"] == 12
+    assert 0 <= m["onTime"] <= 1
+    assert R["best"]["cost"] <= R["naiveCost"] + 1e-6
+
+
+def test_custom_problem_explicit_lists():
+    pb = {"machines": [{"speed": 1.0, "power": 5.0}],
+          "jobs": [{"dur": 2.0, "tier": 3, "deadline": 10.0},
+                   {"dur": 1.0, "tier": 1, "deadline": 10.0}]}
+    R = solver.run({"t": 0.7, "e": 0.55, "d": 0.9}, None, pb)
+    m = R["best"]["m"]
+    # one machine, two jobs: makespan is exactly the summed runtime, all on time
+    assert m["mm"] == 1 and m["n"] == 2
+    assert abs(m["makespan"] - 3.0) < 1e-9
+    assert m["onTime"] == 1.0
+    # scenario multipliers apply on top of explicit lists
+    R2 = solver.run({"t": 0.7, "e": 0.55, "d": 0.9}, {"durMult": 2.0}, pb)
+    assert abs(R2["best"]["m"]["makespan"] - 6.0) < 1e-9
+
+
 def test_db_persistence_or_graceful_noop():
     from app import db
     w = {"t": 0.7, "e": 0.55, "d": 0.9}

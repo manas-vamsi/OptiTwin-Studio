@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { solve } from "@/lib/api";
-import type { RunResult } from "@/lib/types";
+import { loadSpec, specSummary } from "@/lib/problem";
+import type { ProblemSpec, RunResult } from "@/lib/types";
 
 const OBJ = [
   { label: "Minimize production time", def: 70 },
@@ -25,12 +26,15 @@ export default function Optimization() {
   const [step, setStep] = useState(-1);
   const [res, setRes] = useState<RunResult | null>(null);
   const [source, setSource] = useState("");
+  const [spec, setSpec] = useState<ProblemSpec | null>(null);
+  useEffect(() => setSpec(loadSpec()), []);
+  const inst = specSummary(spec);
 
   const solverCount = Object.values(on).filter(Boolean).length;
 
   async function run() {
     setRunning(true); setRes(null); setStep(0);
-    const p = solve({ t: weights[0] / 100, e: weights[1] / 100, d: weights[2] / 100 });
+    const p = solve({ t: weights[0] / 100, e: weights[1] / 100, d: weights[2] / 100 }, undefined, spec);
     for (let i = 0; i < STEPS.length; i++) { setStep(i); await delay(850); }
     const r = await p;
     setSource(r.source); setRes(r); setRunning(false); setStep(-1);
@@ -44,7 +48,9 @@ export default function Optimization() {
       <div className="page-head stagger">
         <div>
           <div className="page-title">Optimization <span className="serif">Engine</span></div>
-          <div className="page-sub">CNC Production Scheduling · 20 machines · 250 jobs</div>
+          <div className="page-sub">
+            {inst.custom ? "Custom instance" : "CNC Production Scheduling"} · {inst.machines} machines · {inst.jobs} jobs
+          </div>
         </div>
         <div className="head-actions">
           <div className="seg">
@@ -107,12 +113,16 @@ minimize  ${(weights[0] / 100).toFixed(2)}·Σ makespan + ${(weights[1] / 100).t
             </div>
             <div className="card glass card-pad">
               <div className="card-head"><h3>QUBO preview</h3><span className="link">Hybrid backend</span></div>
-              <div className="code-block">{`# Quadratic Unconstrained Binary Optimization
-Q = 5000 × 5000 upper-triangular   # 250 jobs × 20 machines
-H = Σ Qᵢᵢ·xᵢ + Σ Qᵢⱼ·xᵢxⱼ          # 675,000 nonzeros, penalty λ = 8.0
+              <div className="code-block">{(() => {
+                const n = inst.jobs, mm = inst.machines, dim = n * mm;
+                const nnz = n * mm + n * (mm * (mm - 1)) / 2 + mm * (n * (n - 1)) / 2;
+                return `# Quadratic Unconstrained Binary Optimization
+Q = ${dim.toLocaleString()} × ${dim.toLocaleString()} upper-triangular   # ${n} jobs × ${mm} machines
+H = Σ Qᵢᵢ·xᵢ + Σ Qᵢⱼ·xᵢxⱼ          # ${nnz.toLocaleString()} nonzeros, penalty λ = 8.0
 #   objective: time + energy + load-balance quadratic
 anneal → dwave-samplers SA   reads: 4   sweeps: 200
-# same matrix a D-Wave QPU consumes — see GET /api/qubo`}</div>
+# same matrix a D-Wave QPU consumes — see GET /api/qubo`;
+              })()}</div>
             </div>
           </div>
         </div>
@@ -189,7 +199,7 @@ function Results({ res, score, source, C }: { res: RunResult; score: number; sou
         </div>
         <div className="score-copy">
           <h3>{NAME[res.best.kind]} found the best schedule</h3>
-          <p>Reordering 250 jobs across 20 machines cut makespan by {timeCut}% and trimmed energy {enSave}% — on-time delivery {(x.onTime * 100).toFixed(1)}%. {winPct > 0 ? `The ${NAME[res.best.kind].toLowerCase()} solver beat the classical baseline by ${winPct}% on weighted quality.` : "All solvers converged to the same quality."}</p>
+          <p>Reordering {x.n ?? 250} jobs across {x.mm} machines cut makespan by {timeCut}% and trimmed energy {enSave}% — on-time delivery {(x.onTime * 100).toFixed(1)}%. {winPct > 0 ? `The ${NAME[res.best.kind].toLowerCase()} solver beat the classical baseline by ${winPct}% on weighted quality.` : "All solvers converged to the same quality."}</p>
           <span className="conf">✓ Confidence {score}% · solved via {source} engine ({res.best.backend ?? "local"})</span>
         </div>
       </div>

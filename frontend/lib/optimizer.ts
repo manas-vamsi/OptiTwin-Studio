@@ -1,7 +1,7 @@
 // Client-side optimizer — identical model to backend/app/solver.py. Used as a
 // fallback when the FastAPI backend isn't running so the UI always works.
 // ponytail: prototype engine; the backend's OR-Tools/Qiskit path is authoritative.
-import type { Weights, Scenario, Metrics, SolverResult, RunResult } from "./types";
+import type { Weights, Scenario, ProblemSpec, Metrics, SolverResult, RunResult } from "./types";
 
 const M = 20, N = 250, PEAK_MULT = 1.6, KWH_COST = 0.15, LATE_PENALTY = 50, HOUR_VALUE = 18;
 
@@ -11,15 +11,21 @@ function rng(seed: number) {
 
 interface Data { machines: { speed: number; power: number }[]; jobs: { dur: number; tier: number; deadline: number }[] }
 
-function buildData(sc: Scenario = {}): Data {
+function buildData(sc: Scenario = {}, pb: ProblemSpec = {}): Data {
+  const mm = pb.machines?.length ?? pb.nMachines ?? M;
+  const n = pb.jobs?.length ?? pb.nJobs ?? N;
   const r = rng(20250707);
-  let machines = Array.from({ length: M }, () => ({ speed: 0.85 + r() * 0.5, power: (5 + r() * 6) * (sc.powerMult ?? 1) }));
-  const jobs = Array.from({ length: N }, () => {
-    const dur = (0.5 + r() * 3.5) * (sc.durMult ?? 1);
-    const tier = r() < 0.2 ? 3 : (r() < 0.5 ? 2 : 1);
-    return { dur, tier, deadline: (8 + r() * 60) * (sc.deadlineMult ?? 1) };
-  });
-  if (sc.machinesOff) machines = machines.slice(0, Math.max(5, M - sc.machinesOff));
+  let machines = pb.machines
+    ? pb.machines.map((m) => ({ speed: m.speed, power: m.power * (sc.powerMult ?? 1) }))
+    : Array.from({ length: mm }, () => ({ speed: 0.85 + r() * 0.5, power: (5 + r() * 6) * (sc.powerMult ?? 1) }));
+  const jobs = pb.jobs
+    ? pb.jobs.map((j) => ({ dur: j.dur * (sc.durMult ?? 1), tier: j.tier, deadline: j.deadline * (sc.deadlineMult ?? 1) }))
+    : Array.from({ length: n }, () => {
+      const dur = (0.5 + r() * 3.5) * (sc.durMult ?? 1);
+      const tier = r() < 0.2 ? 3 : (r() < 0.5 ? 2 : 1);
+      return { dur, tier, deadline: (8 + r() * 60) * (sc.deadlineMult ?? 1) };
+    });
+  if (sc.machinesOff) machines = machines.slice(0, Math.max(1, machines.length - sc.machinesOff));
   return { machines, jobs };
 }
 
@@ -43,7 +49,7 @@ function evaluate(D: Data, mj: number[][]): Metrics {
     }
     if (clock > makespan) makespan = clock;
   });
-  return { makespan, energy, lateness, onTime: onTime / N, util: busy / (mm * makespan), mm };
+  return { makespan, energy, lateness, onTime: onTime / D.jobs.length, util: busy / (mm * makespan), mm, n: D.jobs.length };
 }
 
 export function money(s: Metrics, kwh = KWH_COST) {
@@ -89,8 +95,8 @@ function solveOne(D: Data, base: Metrics, w: Weights, kind: SolverResult["kind"]
   return { kind, m, cost: cost(m, base, w), time: +(0.6 + iters / 220 + (kind === "quantum" ? 1.4 : 0)).toFixed(1), quality: 0 };
 }
 
-export function run(weights: Weights, scenario?: Scenario): RunResult {
-  const D = buildData(scenario), kwh = KWH_COST * (scenario?.energyMult ?? 1);
+export function run(weights: Weights, scenario?: Scenario, problem?: ProblemSpec): RunResult {
+  const D = buildData(scenario, problem), kwh = KWH_COST * (scenario?.energyMult ?? 1);
   const base = evaluate(D, naive(D)), w = weights, naiveCost = cost(base, base, w);
   const solvers = (["classical", "quantum", "hybrid"] as const).map((k) => solveOne(D, base, w, k));
   const lo = Math.min(...solvers.map((s) => s.cost));

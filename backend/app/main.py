@@ -25,8 +25,9 @@ def health() -> dict:
 def solve(req: SolveRequest) -> dict:
     weights = req.weights.model_dump()
     sc = req.scenario.model_dump() if req.scenario else None
-    result = solver.run(weights, sc)
-    result["runId"] = db.save_run(weights, sc, result)   # None if DB is off
+    pb = req.problem.model_dump(exclude_none=True) if req.problem else None
+    result = solver.run(weights, sc, pb)
+    result["runId"] = db.save_run(weights, sc, result, pb)   # None if DB is off
     return result
 
 

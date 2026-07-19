@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { solve } from "@/lib/api";
-import type { RunResult, Scenario } from "@/lib/types";
+import { loadSpec } from "@/lib/problem";
+import type { ProblemSpec, RunResult, Scenario } from "@/lib/types";
 
 const SCENARIOS: { id: string; icon: string; name: string; desc: string; sc: Scenario }[] = [
   { id: "mfail", icon: "⚠️", name: "Machine failure", desc: "3 CNC machines go down", sc: { machinesOff: 3 } },
@@ -18,11 +19,13 @@ export default function Simulation() {
   const [pick, setPick] = useState<(typeof SCENARIOS)[number] | null>(null);
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<{ nom: RunResult; sim: RunResult; name: string } | null>(null);
+  const [spec, setSpec] = useState<ProblemSpec | null>(null);
+  useEffect(() => setSpec(loadSpec()), []);
 
   async function run() {
     if (!pick) return;
     setBusy(true);
-    const [nom, sim] = await Promise.all([solve(W), solve(W, pick.sc)]);
+    const [nom, sim] = await Promise.all([solve(W, undefined, spec), solve(W, pick.sc, spec)]);
     setOut({ nom, sim, name: pick.name });
     setBusy(false);
   }
@@ -87,7 +90,7 @@ function SimResults({ nom, sim, name }: { nom: RunResult; sim: RunResult; name: 
       <div className="card glass card-pad stagger">
         <div className="card-head"><h3>What the engine did</h3><span className="link">Re-solved under scenario</span></div>
         <p style={{ fontSize: 13.5, color: "var(--text-dim)", lineHeight: 1.7 }}>
-          Under “{name}”, the engine re-solved {b.mm} available machines across 250 jobs.
+          Under “{name}”, the engine re-solved {b.mm} available machines across {b.n ?? 250} jobs.
           Makespan {dm >= 0 ? "rose" : "fell"} {Math.abs(dm)}% and projected cost {dc >= 0 ? "increased" : "dropped"} {Math.abs(dc)}%,
           holding on-time delivery at {(b.onTime * 100).toFixed(1)}%.{" "}
           {dm > 8 ? "Recommendation: add capacity or pull Tier-A jobs earlier to protect deadlines."

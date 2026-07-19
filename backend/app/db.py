@@ -23,12 +23,15 @@ CREATE TABLE IF NOT EXISTS runs (
     created_at  timestamptz NOT NULL DEFAULT now(),
     weights     jsonb NOT NULL,
     scenario    jsonb,
+    problem     jsonb,
     result      jsonb NOT NULL,
     improve_pct int   NOT NULL,
     best_kind   text  NOT NULL,
     best_backend text NOT NULL
 )
 """
+# pre-existing tables from before the problem column (added 2026-07-20)
+_MIGRATE = "ALTER TABLE runs ADD COLUMN IF NOT EXISTS problem jsonb"
 _ready = False
 
 
@@ -45,22 +48,25 @@ def available() -> bool:
     try:
         with _conn() as c:
             c.execute(_SCHEMA)
+            c.execute(_MIGRATE)
         _ready = True
     except Exception:
         return False
     return True
 
 
-def save_run(weights: dict, scenario: dict | None, result: dict) -> int | None:
+def save_run(weights: dict, scenario: dict | None, result: dict,
+             problem: dict | None = None) -> int | None:
     """Persist a solve; returns the run id, or None if the DB is unavailable."""
     if not available():
         return None
     try:
         with _conn() as c:
             row = c.execute(
-                "INSERT INTO runs (weights, scenario, result, improve_pct, best_kind, best_backend)"
-                " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                "INSERT INTO runs (weights, scenario, problem, result, improve_pct, best_kind, best_backend)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
                 (json.dumps(weights), json.dumps(scenario) if scenario else None,
+                 json.dumps(problem) if problem else None,
                  json.dumps(result), result["improvePct"],
                  result["best"]["kind"], result["best"]["backend"])).fetchone()
             return row[0]

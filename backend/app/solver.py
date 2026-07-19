@@ -62,20 +62,33 @@ def _rng(seed: int) -> Callable[[], float]:
     return nxt
 
 
-def build_data(scenario: dict | None = None) -> dict:
-    sc = scenario or {}
+def build_data(scenario: dict | None = None, problem: dict | None = None) -> dict:
+    """Build the instance. Default is the 20x250 CNC dataset; a problem spec
+    overrides sizes (counts -> deterministic generation) or supplies explicit
+    machine/job lists. Scenario multipliers apply on top either way."""
+    sc, pb = scenario or {}, problem or {}
+    mm = len(pb["machines"]) if pb.get("machines") else int(pb.get("nMachines") or M)
+    n = len(pb["jobs"]) if pb.get("jobs") else int(pb.get("nJobs") or N)
     r = _rng(20250707)
-    machines = [{"speed": 0.85 + r() * 0.5,
-                 "power": (5 + r() * 6) * sc.get("powerMult", 1)} for _ in range(M)]
-    jobs = []
-    for _ in range(N):
-        dur = (0.5 + r() * 3.5) * sc.get("durMult", 1)
-        tier = 3 if r() < 0.2 else (2 if r() < 0.5 else 1)
-        jobs.append({"dur": dur, "tier": tier,
-                     "deadline": (8 + r() * 60) * sc.get("deadlineMult", 1)})
+    if pb.get("machines"):
+        machines = [{"speed": m["speed"], "power": m["power"] * sc.get("powerMult", 1)}
+                    for m in pb["machines"]]
+    else:
+        machines = [{"speed": 0.85 + r() * 0.5,
+                     "power": (5 + r() * 6) * sc.get("powerMult", 1)} for _ in range(mm)]
+    if pb.get("jobs"):
+        jobs = [{"dur": j["dur"] * sc.get("durMult", 1), "tier": j["tier"],
+                 "deadline": j["deadline"] * sc.get("deadlineMult", 1)} for j in pb["jobs"]]
+    else:
+        jobs = []
+        for _ in range(n):
+            dur = (0.5 + r() * 3.5) * sc.get("durMult", 1)
+            tier = 3 if r() < 0.2 else (2 if r() < 0.5 else 1)
+            jobs.append({"dur": dur, "tier": tier,
+                         "deadline": (8 + r() * 60) * sc.get("deadlineMult", 1)})
     off = int(sc.get("machinesOff", 0))
     if off:
-        machines = machines[:max(5, M - off)]
+        machines = machines[:max(1, len(machines) - off)]
     return {"machines": machines, "jobs": jobs}
 
 
@@ -107,8 +120,9 @@ def evaluate(D: dict, mj: list[list[int]]) -> dict:
             clock = end
             busy += run
         makespan = max(makespan, clock)
+    n = len(D["jobs"])
     return {"makespan": makespan, "energy": energy, "lateness": lateness,
-            "onTime": ontime / N, "util": busy / (mm * makespan), "mm": mm}
+            "onTime": ontime / n, "util": busy / (mm * makespan), "mm": mm, "n": n}
 
 
 def money(s: dict, kwh: float = KWH_COST) -> float:
@@ -261,8 +275,8 @@ def solve(D, base, w, kind) -> dict:
             "time": round(time.perf_counter() - t0, 2), "backend": backend}
 
 
-def run(weights: dict, scenario: dict | None = None) -> dict:
-    D = build_data(scenario)
+def run(weights: dict, scenario: dict | None = None, problem: dict | None = None) -> dict:
+    D = build_data(scenario, problem)
     kwh = KWH_COST * ((scenario or {}).get("energyMult", 1))
     base = evaluate(D, naive(D))
     w = {"t": weights["t"], "e": weights["e"], "d": weights["d"]}
