@@ -8,6 +8,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: optitwin
+          POSTGRES_PASSWORD: optitwin
+          POSTGRES_DB: optitwin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U optitwin"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://optitwin:optitwin@localhost:5432/optitwin
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,7 +29,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r backend/requirements.txt
-      - name: Solver tests (real backends)
+      - name: Solver tests (real backends + Postgres persistence)
         run: python backend/tests/test_solver.py
 
   backend-fallback:

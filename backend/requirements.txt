@@ -6,3 +6,7 @@ pydantic>=2.6
 # without them — every path falls back to the pure-Python greedy+SA solver.
 ortools>=9.10
 dwave-samplers>=1.3
+
+# Persistence — solve-run history in Postgres. Optional: no DATABASE_URL or
+# unreachable server just disables /api/runs; solving is unaffected.
+psycopg[binary]>=3.1
