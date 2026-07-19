@@ -5,7 +5,12 @@ export interface Scenario {
 }
 export interface Metrics {
   makespan: number; energy: number; lateness: number;
-  onTime: number; util: number; mm: number;
+  onTime: number; util: number; mm: number; n?: number;
+}
+export interface ProblemSpec {
+  nMachines?: number; nJobs?: number;
+  machines?: { speed: number; power: number }[];
+  jobs?: { dur: number; tier: number; deadline: number }[];
 }
 export interface SolverResult {
   kind: "classical" | "quantum" | "hybrid";

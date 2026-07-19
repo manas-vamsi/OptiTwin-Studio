@@ -96,7 +96,10 @@ identical client-side optimizer, so the UI always works.
 
 Real operations-research — three genuinely different solvers on one model:
 
-- **Model** — 250 jobs on 20 machines, per-machine speed + power, 12–18h peak tariff (1.6×), deadlines, A/B/C priority tiers.
+- **Model** — 250 jobs on 20 machines by default, per-machine speed + power, 12–18h peak
+  tariff (1.6×), deadlines, A/B/C priority tiers. **Custom instances** via the Problem
+  view (type “3 machines, 40 trays…”, adjust counts, or upload a jobs CSV) or the API
+  (`problem: {nMachines, nJobs}` or explicit machine/job lists, Pydantic-capped at 25×300).
 - **Baseline** — naive round-robin.
 - **Classical** — OR-Tools **CP-SAT** (Google's C++ MIP engine): exact assignment
   minimizing makespan + energy under a 3 s time cap, then EDD sequencing + SA polish.
@@ -135,3 +138,5 @@ python ../tests/bench_kernel.py    # verifies identical results + prints speedup
 - [x] Digital Twin (React Flow graph + node inspector drawer)
 - [x] Simulation (scenario library — 6 what-ifs, engine-driven deltas)
 - [x] Reports (executive/optimization/technical + CSV/PDF)
+- [x] Postgres run history (`/api/runs`)
+- [x] Custom problem instances (Problem view text/CSV → real solver input)
