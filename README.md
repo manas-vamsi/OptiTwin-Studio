@@ -10,6 +10,12 @@ and explains every decision.
 
 > Quantum is one solver, not the point. This is an optimization platform.
 
+![Dashboard](docs/screens/dashboard.png)
+
+| Digital Twin | Optimization Engine |
+|---|---|
+| ![Twin](docs/screens/twin.png) | ![Optimization](docs/screens/optimization.png) |
+
 ## Structure
 
 ```
