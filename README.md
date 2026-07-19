@@ -23,7 +23,12 @@ prototype/   original single-file design reference (index.html)
 
 ## Run
 
-**Backend**
+**One command (Docker)**
+```bash
+docker compose up            # frontend :3000, backend :8000
+```
+
+**Or by hand — Backend**
 ```bash
 cd backend
 python -m venv .venv && .venv/Scripts/activate   # Windows;  source .venv/bin/activate on *nix
