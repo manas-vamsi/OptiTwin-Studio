@@ -2,8 +2,7 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.6
 
-# Optional — real solvers. Install on a supported Python (3.11/3.12) to enable
-# the OR-Tools classical path and Qiskit QUBO annealing. The service runs
-# without them via the pure-Python fallback.
-# ortools>=9.9
-# qiskit-optimization>=0.6
+# Real solver backends (Python 3.11-3.12 wheels). The service still runs
+# without them — every path falls back to the pure-Python greedy+SA solver.
+ortools>=9.10
+dwave-samplers>=1.3

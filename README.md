@@ -43,15 +43,23 @@ identical client-side optimizer, so the UI always works.
 
 ## The optimizer
 
-Real operations-research, not canned numbers:
+Real operations-research — three genuinely different solvers on one model:
 
-- **Model** — N jobs on M machines, per-machine speed + power, 12–18h peak tariff, deadlines, A/B/C priority tiers.
+- **Model** — 250 jobs on 20 machines, per-machine speed + power, 12–18h peak tariff (1.6×), deadlines, A/B/C priority tiers.
 - **Baseline** — naive round-robin.
-- **Solvers** — LPT greedy warm-start + simulated-annealing local search (classical / quantum-inspired / hybrid).
-- **QUBO** — one-hot assignment penalty mapped to a sparse Q matrix (`qubo.py`).
+- **Classical** — OR-Tools **CP-SAT** (Google's C++ MIP engine): exact assignment
+  minimizing makespan + energy under a 3 s time cap, then EDD sequencing + SA polish.
+- **Quantum-inspired** — full **QUBO** (`qubo.py`): objective terms (time + energy +
+  load-balance quadratic) plus one-hot penalty, ~675 k nonzeros, annealed by
+  `dwave-samplers` (C++ core). The same matrix + pipeline a D-Wave QPU consumes.
+- **Hybrid** — QUBO annealing for the assignment + simulated-annealing local search
+  for sequencing (assignment is QUBO-expressible; sequencing isn't — that split
+  *is* the hybrid).
 
-OR-Tools (CP-SAT) and Qiskit are **optional** imports — enabled on a supported Python
-(3.11/3.12); otherwise the pure-Python path runs.
+Every path falls back to the pure-Python greedy+SA solver if its library is
+missing or fails, and each result reports its true `backend`
+(`cpsat` / `neal` / `neal+sa` / `python`) and wall-clock solve time.
+Python 3.11/3.12 needed for the ortools + dwave-samplers wheels; any Python runs the fallback.
 
 ## Roadmap (view-by-view PRs)
 

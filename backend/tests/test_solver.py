@@ -26,6 +26,33 @@ def test_qubo_shape():
     assert q["dim"] == 12 and q["nnz"] > 0
 
 
+def test_qubo_objective_and_decode():
+    D = solver.build_data()
+    D = {"jobs": D["jobs"][:6], "machines": D["machines"][:3]}
+    w = {"t": 0.7, "e": 0.55, "d": 0.9}
+    Q = qubo.build_qubo(D, w)
+    # diagonal must carry objective terms, not just the bare one-hot penalty
+    diags = {v for (a, b), v in Q.items() if a == b}
+    assert len(diags) > 1, "diagonal has no per-assignment objective terms"
+    # decode repairs invalid samples: every job on exactly one machine
+    mj = qubo.decode({}, 6, 3)
+    assert sorted(j for lst in mj for j in lst) == list(range(6))
+
+
+def test_real_backends_report_truthfully():
+    R = solver.run({"t": 0.7, "e": 0.55, "d": 0.9})
+    for s in R["solvers"]:
+        expected = {"classical": {"cpsat", "python"},
+                    "quantum": {"neal", "python"},
+                    "hybrid": {"neal+sa", "python"}}[s["kind"]]
+        assert s["backend"] in expected
+        assert s["time"] >= 0
+    if solver.HAS_ORTOOLS:
+        assert R["solvers"][0]["backend"] == "cpsat"
+    if solver.HAS_NEAL:
+        assert R["solvers"][1]["backend"] == "neal"
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
