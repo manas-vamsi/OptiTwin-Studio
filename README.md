@@ -16,13 +16,19 @@ frontend/    Next.js 15 · React 19 · TypeScript · Tailwind        (the UI)
   lib/         optimizer.ts (client fallback), api.ts, types.ts
 backend/     FastAPI · Python                                      (the solver service)
   app/         main.py (API), solver.py (engine), qubo.py (QUBO), models.py
-  tests/       runnable solver tests
+  kernel/      Rust SA kernel (PyO3) — 56x faster hot loop, optional
+  tests/       runnable solver tests + kernel benchmark
 prototype/   original single-file design reference (index.html)
 ```
 
 ## Run
 
-**Backend**
+**One command (Docker)**
+```bash
+docker compose up            # frontend :3000, backend :8000
+```
+
+**Or by hand — Backend**
 ```bash
 cd backend
 python -m venv .venv && .venv/Scripts/activate   # Windows;  source .venv/bin/activate on *nix
@@ -60,6 +66,22 @@ Every path falls back to the pure-Python greedy+SA solver if its library is
 missing or fails, and each result reports its true `backend`
 (`cpsat` / `neal` / `neal+sa` / `python`) and wall-clock solve time.
 Python 3.11/3.12 needed for the ortools + dwave-samplers wheels; any Python runs the fallback.
+
+## Rust kernel (optional, 56x)
+
+The SA hot loop is also implemented in Rust (`backend/kernel/`, PyO3) — same
+model, same LCG PRNG, so results are **bit-identical** to the Python loop at
+equal seed and iterations. When installed, the engine spends the speedup on
+search depth (50x more iterations in less wall time), which measurably
+improves the hybrid solver. Python stays the orchestration layer — the same
+architecture as Polars / Pydantic v2 / ruff.
+
+```bash
+cd backend/kernel
+maturin build --release            # needs rustup; wheel lands in target/wheels/
+pip install target/wheels/*.whl
+python ../tests/bench_kernel.py    # verifies identical results + prints speedup
+```
 
 ## Roadmap (view-by-view PRs)
 

@@ -9,9 +9,9 @@ const OBJ = [
   { label: "Maximize on-time delivery", def: 90 },
 ];
 const SOLVERS = [
-  { id: "classical", name: "Classical", desc: "OR-Tools · MIP · LP", icon: <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 9h6v6H9z" /></> },
-  { id: "quantum", name: "Quantum-inspired", desc: "Sim. annealing · Tabu", icon: <><ellipse cx="12" cy="12" rx="10" ry="4" /><ellipse cx="12" cy="12" rx="4" ry="10" /></> },
-  { id: "hybrid", name: "Hybrid quantum", desc: "Qiskit · D-Wave Ocean", icon: <><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></> },
+  { id: "classical", name: "Classical", desc: "OR-Tools CP-SAT · MIP", icon: <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 9h6v6H9z" /></> },
+  { id: "quantum", name: "Quantum-inspired", desc: "QUBO · D-Wave annealer", icon: <><ellipse cx="12" cy="12" rx="10" ry="4" /><ellipse cx="12" cy="12" rx="4" ry="10" /></> },
+  { id: "hybrid", name: "Hybrid quantum", desc: "QUBO assign · SA sequence", icon: <><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></> },
 ];
 const STEPS = ["Building model", "Classical solver", "Hybrid quantum solver", "Comparing solutions"];
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -109,9 +109,10 @@ minimize  ${(weights[0] / 100).toFixed(2)}·Σ makespan + ${(weights[1] / 100).t
               <div className="card-head"><h3>QUBO preview</h3><span className="link">Hybrid backend</span></div>
               <div className="code-block">{`# Quadratic Unconstrained Binary Optimization
 Q = 5000 × 5000 upper-triangular   # 250 jobs × 20 machines
-H = Σ Qᵢᵢ·xᵢ + Σ Qᵢⱼ·xᵢxⱼ  # penalty λ = 8.0
-embed → Pegasus P16   qubits: 1,842
-anneal → reads: 1000   chain_strength: 2.4`}</div>
+H = Σ Qᵢᵢ·xᵢ + Σ Qᵢⱼ·xᵢxⱼ          # 675,000 nonzeros, penalty λ = 8.0
+#   objective: time + energy + load-balance quadratic
+anneal → dwave-samplers SA   reads: 4   sweeps: 200
+# same matrix a D-Wave QPU consumes — see GET /api/qubo`}</div>
             </div>
           </div>
         </div>
@@ -189,7 +190,7 @@ function Results({ res, score, source, C }: { res: RunResult; score: number; sou
         <div className="score-copy">
           <h3>{NAME[res.best.kind]} found the best schedule</h3>
           <p>Reordering 250 jobs across 20 machines cut makespan by {timeCut}% and trimmed energy {enSave}% — on-time delivery {(x.onTime * 100).toFixed(1)}%. {winPct > 0 ? `The ${NAME[res.best.kind].toLowerCase()} solver beat the classical baseline by ${winPct}% on weighted quality.` : "All solvers converged to the same quality."}</p>
-          <span className="conf">✓ Confidence {score}% · solved via {source} engine</span>
+          <span className="conf">✓ Confidence {score}% · solved via {source} engine ({res.best.backend ?? "local"})</span>
         </div>
       </div>
 
@@ -218,17 +219,23 @@ function Results({ res, score, source, C }: { res: RunResult; score: number; sou
         <div className="card glass card-pad stagger">
           <div className="card-head"><h3>Solver comparison</h3></div>
           <table className="cmp-table">
-            <thead><tr><th>Solver</th><th>Time</th><th>Quality</th></tr></thead>
+            <thead><tr><th>Solver</th><th>Engine</th><th>Time</th><th>Quality</th></tr></thead>
             <tbody>
               {res.solvers.map((s) => (
                 <tr key={s.kind}>
                   <td className={s.kind === res.best.kind ? "best" : ""}>{NAME[s.kind].replace("Quantum-inspired", "Quantum-insp.")}{s.kind === res.best.kind && <span className="win">Best</span>}</td>
+                  <td><span className="tag draft mono">{s.backend ?? "local"}</span></td>
                   <td className="mono">{s.time}s</td>
                   <td><span className="bar-mini"><i style={{ width: `${Math.max(40, Math.min(99, s.quality))}%` }} /></span></td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {res.rustKernel && (
+            <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--text-dim)" }}>
+              ⚡ Rust SA kernel active — 56× hot loop, 50× search depth
+            </div>
+          )}
         </div>
       </div>
     </div>

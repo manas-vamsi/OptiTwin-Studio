@@ -14,4 +14,5 @@ export interface SolverResult {
 export interface RunResult {
   base: Metrics; baseMoney: number; bestMoney: number; naiveCost: number;
   solvers: SolverResult[]; best: SolverResult; improvePct: number;
+  rustKernel?: boolean;
 }

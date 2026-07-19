@@ -40,6 +40,14 @@ try:                                  # optional QUBO annealer (C++ core)
 except Exception:                     # pragma: no cover - env dependent
     HAS_NEAL = False
 
+try:                                  # optional Rust SA kernel (backend/kernel)
+    import optitwin_kernel            # type: ignore
+    HAS_RUST = True
+except Exception:                     # pragma: no cover - env dependent
+    HAS_RUST = False
+
+RUST_MULT = 50  # Rust runs ~2 orders of magnitude faster; spend it on search depth
+
 from . import qubo
 
 
@@ -139,6 +147,14 @@ def greedy(D: dict, base: dict, w: dict) -> list[list[int]]:
 
 
 def anneal(D, base, w, start, iters, seed) -> tuple[list[list[int]], float]:
+    if HAS_RUST:
+        mj = optitwin_kernel.anneal(
+            [m["speed"] for m in D["machines"]], [m["power"] for m in D["machines"]],
+            [j["dur"] for j in D["jobs"]], [float(j["tier"]) for j in D["jobs"]],
+            [j["deadline"] for j in D["jobs"]], start,
+            (base["makespan"], base["energy"], base["lateness"]),
+            (w["t"], w["e"], w["d"]), iters * RUST_MULT, seed)
+        return mj, cost(evaluate(D, mj), base, w)
     r = _rng(seed)
     mm = len(D["machines"])
     cur = [l[:] for l in start]
@@ -258,4 +274,5 @@ def run(weights: dict, scenario: dict | None = None) -> dict:
     best = min(solvers, key=lambda s: s["cost"])
     return {"base": base, "baseMoney": money(base, kwh), "bestMoney": money(best["m"], kwh),
             "naiveCost": naive_cost, "solvers": solvers, "best": best,
-            "improvePct": round(100 * (naive_cost - best["cost"]) / naive_cost)}
+            "improvePct": round(100 * (naive_cost - best["cost"]) / naive_cost),
+            "rustKernel": HAS_RUST}
